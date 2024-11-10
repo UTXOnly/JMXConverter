@@ -89,7 +89,6 @@ public class RemoteMBeanLister {
             return "histogram";
         }
         return "gauge";
-
     }
 
     private static void writeMetricsYaml(Map<String, Map<String, String>> metrics, String host, String port) {
@@ -103,17 +102,19 @@ public class RemoteMBeanLister {
             writer.println("init_config:");
             writer.println("  conf:");
 
-            // Group all bean configurations under a single include section
-            for (Map.Entry<String, Map<String, String>> entry : metrics.entrySet()) {
-                writer.println("      - include:");
-                writer.println("          bean: " + entry.getKey());
-                writer.println("          attribute:");
+            // Group all attributes under a single `include` without `bean` field and add `alias` and `metric_type`
+            writer.println("      - include:");
+            writer.println("          attribute:");
 
+            for (Map.Entry<String, Map<String, String>> entry : metrics.entrySet()) {
                 for (Map.Entry<String, String> attrEntry : entry.getValue().entrySet()) {
                     String attrName = attrEntry.getKey();
                     String metricType = attrEntry.getValue();
-                    writer.println("            - " + attrName + ":");
-                    writer.println("                metric_type: " + metricType);
+
+                    // Write the attribute configuration with alias and metric_type
+                    writer.println("              " + attrName + ":");
+                    writer.println("                  alias: " + generateAlias(entry.getKey(), attrName));
+                    writer.println("                  metric_type: " + metricType);
                 }
             }
 
@@ -122,5 +123,12 @@ public class RemoteMBeanLister {
         } catch (IOException e) {
             System.err.println("Failed to write metrics.yaml: " + e.getMessage());
         }
+    }
+
+    private static String generateAlias(String beanName, String attrName) {
+        // Generate a unique alias with 'jmx.' prefix based on the bean and attribute name
+        String aliasBase = beanName.replaceAll("[^a-zA-Z0-9]", "_").toLowerCase();
+        String aliasAttr = attrName.replaceAll("[^a-zA-Z0-9]", "_").toLowerCase();
+        return "jmx." + aliasBase + "." + aliasAttr;
     }
 }
