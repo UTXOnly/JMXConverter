@@ -129,6 +129,6 @@ public class RemoteMBeanLister {
         // Generate a unique alias with 'jmx.' prefix based on the bean and attribute name
         String aliasBase = beanName.replaceAll("[^a-zA-Z0-9]", "_").toLowerCase();
         String aliasAttr = attrName.replaceAll("[^a-zA-Z0-9]", "_").toLowerCase();
-        return "jmx." + "." + aliasAttr;
+        return "jmx." + aliasAttr;
     }
 }
