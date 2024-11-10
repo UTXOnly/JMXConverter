@@ -32,8 +32,8 @@ public class RemoteMBeanLister {
             JMXConnector jmxConnector = JMXConnectorFactory.connect(serviceURL);
             MBeanServerConnection mBeanServer = jmxConnector.getMBeanServerConnection();
 
-            // Map to store the MBeans and their attributes that meet the criteria
-            Map<String, Map<String, String>> metrics = new HashMap<>();
+            // Map to store MBeans, their attributes, types, descriptions, and inferred units
+            Map<String, Map<String, Map<String, String>>> metrics = new HashMap<>();
 
             // Iterate over each MBean
             Set<ObjectName> mBeans = mBeanServer.queryNames(null, null);
@@ -47,18 +47,21 @@ public class RemoteMBeanLister {
                 for (MBeanAttributeInfo attrInfo : attributes) {
                     String attrName = attrInfo.getName();
                     String attrType = attrInfo.getType();
+                    String attrDesc = attrInfo.getDescription();
 
-                    // Check if the attribute is readable and the type is in the allowed list
+                    // Check if the attribute is readable and its type is in the allowed list
                     if (attrInfo.isReadable() && allowedTypes.contains(attrType)) {
                         try {
                             // Retrieve the attribute value to confirm it is accessible
                             mBeanServer.getAttribute(mBeanName, attrName);
 
-                            // Infer the metric type
+                            // Infer the metric type and unit
                             String metricType = inferMetricType(attrName, attrType);
+                            String unit = inferUnitFromDescription(attrDesc);
 
-                            // Add attribute and inferred metric type to the metrics map
-                            metrics.computeIfAbsent(beanName, k -> new HashMap<>()).put(attrName, metricType);
+                            // Add attribute's metric type, description, and inferred unit to the metrics map
+                            metrics.computeIfAbsent(beanName, k -> new HashMap<>())
+                                   .put(attrName, Map.of("type", metricType, "desc", attrDesc, "unit", unit));
 
                         } catch (Exception e) {
                             System.out.println(" (Unable to read value: " + e.getMessage() + ")");
@@ -67,8 +70,8 @@ public class RemoteMBeanLister {
                 }
             }
 
-            // Write the metrics to metrics.yaml, including host and port from the arguments
-            writeMetricsYaml(metrics, host, port);
+            // Write the metrics to OpenTelemetry config format
+            otelConfig(metrics);
 
             // Close the JMX connection
             jmxConnector.close();
@@ -91,44 +94,67 @@ public class RemoteMBeanLister {
         return "gauge";
     }
 
-    private static void writeMetricsYaml(Map<String, Map<String, String>> metrics, String host, String port) {
-        try (PrintWriter writer = new PrintWriter(new FileWriter("metrics.yaml"))) {
-            // Write the Datadog JMX YAML structure with the specified host and port
-            writer.println("instances:");
-            writer.println("  - host: " + host);
-            writer.println("    name: jmx_instance");
-            writer.println("    port: " + port);
-            writer.println();
-            writer.println("init_config:");
-            writer.println("  conf:");
+    private static String inferUnitFromDescription(String description) {
+        // Attempt to infer units from keywords in the description
+        if (description == null) {
+            return "{unit}";  // Default unit if description is null
+        }
 
-            // Group all attributes under a single `include` without `bean` field and add `alias` and `metric_type`
-            writer.println("      - include:");
-            writer.println("          attribute:");
+        description = description.toLowerCase();
 
-            for (Map.Entry<String, Map<String, String>> entry : metrics.entrySet()) {
-                for (Map.Entry<String, String> attrEntry : entry.getValue().entrySet()) {
+        if (description.contains("bytes") || description.contains("size")) {
+            return "{bytes}";
+        } else if (description.contains("milliseconds") || description.contains("ms") || description.contains("seconds") || description.contains("time")) {
+            return "{ms}";
+        } else if (description.contains("requests") || description.contains("connections")) {
+            return "{requests}";
+        } else if (description.contains("count") || description.contains("number")) {
+            return "{count}";
+        }
+        return "{unit}";  // Default unit if no keyword is matched
+    }
+
+    private static void otelConfig(Map<String, Map<String, Map<String, String>>> metrics) {
+        try (PrintWriter writer = new PrintWriter(new FileWriter("otel_config.yaml"))) {
+            writer.println("---");
+            writer.println("rules:");
+
+            for (Map.Entry<String, Map<String, Map<String, String>>> entry : metrics.entrySet()) {
+                String beanName = entry.getKey();
+
+                writer.println("  - bean: " + beanName);
+                writer.println("    mapping:");
+
+                for (Map.Entry<String, Map<String, String>> attrEntry : entry.getValue().entrySet()) {
                     String attrName = attrEntry.getKey();
-                    String metricType = attrEntry.getValue();
+                    Map<String, String> attrDetails = attrEntry.getValue();
+                    String metricType = attrDetails.get("type");
+                    String description = attrDetails.get("desc");
+                    String unit = attrDetails.get("unit");
+                    String alias = generateAlias(attrName);
 
-                    // Write the attribute configuration with alias and metric_type
-                    writer.println("              " + attrName + ":");
-                    writer.println("                  alias: " + generateAlias(entry.getKey(), attrName));
-                    writer.println("                  metric_type: " + metricType);
+                    // Write the OpenTelemetry mapping for each attribute
+                    writer.println("      " + attrName + ":");
+                    writer.println("        metric: " + alias);
+                    writer.println("        type: " + metricType);
+                    writer.println("        desc: " + description);
+                    writer.println("        unit: " + unit);
                 }
             }
 
-            System.out.println("metrics.yaml file created successfully for remote JVM at " + host + ":" + port);
+            System.out.println("otel_config.yaml file created successfully.");
 
         } catch (IOException e) {
-            System.err.println("Failed to write metrics.yaml: " + e.getMessage());
+            System.err.println("Failed to write otel_config.yaml: " + e.getMessage());
         }
     }
 
-    private static String generateAlias(String beanName, String attrName) {
-        // Generate a unique alias with 'jmx.' prefix based on the bean and attribute name
-        String aliasBase = beanName.replaceAll("[^a-zA-Z0-9]", "_").toLowerCase();
-        String aliasAttr = attrName.replaceAll("[^a-zA-Z0-9]", "_").toLowerCase();
-        return "jmx." + aliasAttr;
+    private static String generateAlias(String attrName) {
+        // Convert camelCase to snake_case by inserting underscores before uppercase letters
+        String snakeCaseName = attrName.replaceAll("([a-z])([A-Z])", "$1_$2").toLowerCase();
+    
+        // Add the "jmx." prefix
+        return "jmx." + snakeCaseName;
     }
+
 }
