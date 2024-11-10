@@ -1,65 +1,91 @@
 import javax.management.*;
-import javax.management.remote.*;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.lang.management.ManagementFactory;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public class RemoteMBeanLister {
 
     public static void main(String[] args) {
-        if (args.length < 2) {
-            System.out.println("Usage: java RemoteMBeanLister <hostname> <port>");
-            return;
-        }
-
-        String hostname = args[0];
-        String port = args[1];
-        String url = "service:jmx:rmi:///jndi/rmi://" + hostname + ":" + port + "/jmxrmi";
-
         try {
-            // Connect to the remote MBean server
-            JMXServiceURL serviceURL = new JMXServiceURL(url);
-            JMXConnector jmxConnector = JMXConnectorFactory.connect(serviceURL, null);
-            MBeanServerConnection mBeanServerConnection = jmxConnector.getMBeanServerConnection();
+            // Define a list of allowed types
+            List<String> allowedTypes = Arrays.asList("int", "long", "boolean");
 
-            // Retrieve all MBean object names
-            Set<ObjectName> mBeans = mBeanServerConnection.queryNames(null, null);
+            // Connect to the platform MBean server
+            MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
+            Set<ObjectName> mBeans = mBeanServer.queryNames(null, null);
+
+            // Map to store the MBeans and their attributes that meet the criteria
+            Map<String, List<String>> metrics = new HashMap<>();
 
             // Iterate over each MBean
             for (ObjectName mBeanName : mBeans) {
-                System.out.println("MBean: " + mBeanName);
-
+                String beanName = mBeanName.toString();
+                
                 // Get MBean's attributes
-                MBeanInfo mBeanInfo = mBeanServerConnection.getMBeanInfo(mBeanName);
+                MBeanInfo mBeanInfo = mBeanServer.getMBeanInfo(mBeanName);
                 MBeanAttributeInfo[] attributes = mBeanInfo.getAttributes();
 
                 for (MBeanAttributeInfo attrInfo : attributes) {
                     String attrName = attrInfo.getName();
-                    System.out.print("  Attribute: " + attrName);
+                    String attrType = attrInfo.getType();
 
-                    // Try to get the attribute value if it's readable
-                    if (attrInfo.isReadable()) {
+                    // Check if the attribute is readable and the type is in the allowed list
+                    if (attrInfo.isReadable() && allowedTypes.contains(attrType)) {
                         try {
-                            Object attrValue = mBeanServerConnection.getAttribute(mBeanName, attrName);
-                            System.out.println(" = " + attrValue);
-                            String attType = attrInfo.getType();
-                            System.out.println("Type is " + attType);
+                            // Retrieve the attribute value to confirm it is accessible
+                            mBeanServer.getAttribute(mBeanName, attrName);
+
+                            // Add attribute to the metrics map
+                            metrics.computeIfAbsent(beanName, k -> new java.util.ArrayList<>()).add(attrName);
+
                         } catch (Exception e) {
                             System.out.println(" (Unable to read value: " + e.getMessage() + ")");
                         }
-                    } else {
-                        System.out.println(" (Not readable)");
                     }
                 }
-                System.out.println();
             }
 
-            // Close the connection
-            jmxConnector.close();
-        } catch (IOException e) {
-            System.out.println("Failed to connect to the remote MBean server: " + e.getMessage());
-            e.printStackTrace();
+            // Write the metrics to metrics.yaml
+            writeMetricsYaml(metrics);
+
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
+
+    private static void writeMetricsYaml(Map<String, List<String>> metrics) {
+        try (PrintWriter writer = new PrintWriter(new FileWriter("metrics.yaml"))) {
+            // Write the Datadog JMX YAML structure
+            writer.println("instances:");
+            writer.println("  - host: 127.0.0.1");
+            writer.println("    name: jmx_instance");
+            writer.println("    port: 9999");
+            writer.println();
+            writer.println("init_config:");
+            writer.println("  conf:");
+            
+            // Group all bean configurations under a single include section
+            for (Map.Entry<String, List<String>> entry : metrics.entrySet()) {
+                writer.println("      - include:");
+                writer.println("          bean: " + entry.getKey());
+                writer.println("          attribute:");
+    
+                for (String attrName : entry.getValue()) {
+                    writer.println("            - " + attrName);
+                }
+            }
+    
+            System.out.println("metrics.yaml file created successfully with combined configuration.");
+    
+        } catch (IOException e) {
+            System.err.println("Failed to write metrics.yaml: " + e.getMessage());
+        }
+    }
+
 }
