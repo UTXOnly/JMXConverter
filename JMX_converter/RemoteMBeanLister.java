@@ -24,21 +24,23 @@ public class RemoteMBeanLister {
 
         try {
             // Define a list of allowed types
-            List<String> allowedTypes = Arrays.asList("int", "long", "boolean");
+            List<String> allowedTypes = Arrays.asList("int", "long");
 
+            // Connect to the remote MBean server
             String url = "service:jmx:rmi:///jndi/rmi://" + host + ":" + port + "/jmxrmi";
             JMXServiceURL serviceURL = new JMXServiceURL(url);
             JMXConnector jmxConnector = JMXConnectorFactory.connect(serviceURL);
             MBeanServerConnection mBeanServer = jmxConnector.getMBeanServerConnection();
 
             // Map to store the MBeans and their attributes that meet the criteria
-            Map<String, List<String>> metrics = new HashMap<>();
+            Map<String, Map<String, String>> metrics = new HashMap<>();
 
             // Iterate over each MBean
             Set<ObjectName> mBeans = mBeanServer.queryNames(null, null);
             for (ObjectName mBeanName : mBeans) {
                 String beanName = mBeanName.toString();
 
+                // Get MBean's attributes
                 MBeanInfo mBeanInfo = mBeanServer.getMBeanInfo(mBeanName);
                 MBeanAttributeInfo[] attributes = mBeanInfo.getAttributes();
 
@@ -52,8 +54,11 @@ public class RemoteMBeanLister {
                             // Retrieve the attribute value to confirm it is accessible
                             mBeanServer.getAttribute(mBeanName, attrName);
 
-                            // Add attribute to the metrics map
-                            metrics.computeIfAbsent(beanName, k -> new java.util.ArrayList<>()).add(attrName);
+                            // Infer the metric type
+                            String metricType = inferMetricType(attrName, attrType);
+
+                            // Add attribute and inferred metric type to the metrics map
+                            metrics.computeIfAbsent(beanName, k -> new HashMap<>()).put(attrName, metricType);
 
                         } catch (Exception e) {
                             System.out.println(" (Unable to read value: " + e.getMessage() + ")");
@@ -65,6 +70,7 @@ public class RemoteMBeanLister {
             // Write the metrics to metrics.yaml, including host and port from the arguments
             writeMetricsYaml(metrics, host, port);
 
+            // Close the JMX connection
             jmxConnector.close();
 
         } catch (Exception e) {
@@ -72,7 +78,21 @@ public class RemoteMBeanLister {
         }
     }
 
-    private static void writeMetricsYaml(Map<String, List<String>> metrics, String host, String port) {
+    private static String inferMetricType(String attributeName, String attributeType) {
+        if (attributeName.toLowerCase().contains("count") || attributeName.toLowerCase().contains("total")) {
+            return "counter";
+        } else if (attributeName.toLowerCase().contains("usage") || attributeName.toLowerCase().contains("size") ||
+                   attributeName.toLowerCase().contains("load")) {
+            return "gauge";
+        } else if (attributeName.toLowerCase().contains("percentile") || attributeName.toLowerCase().contains("average") ||
+                   attributeName.toLowerCase().contains("min") || attributeName.toLowerCase().contains("max")) {
+            return "histogram";
+        }
+        return "gauge";
+
+    }
+
+    private static void writeMetricsYaml(Map<String, Map<String, String>> metrics, String host, String port) {
         try (PrintWriter writer = new PrintWriter(new FileWriter("metrics.yaml"))) {
             // Write the Datadog JMX YAML structure with the specified host and port
             writer.println("instances:");
@@ -83,13 +103,17 @@ public class RemoteMBeanLister {
             writer.println("init_config:");
             writer.println("  conf:");
 
-            for (Map.Entry<String, List<String>> entry : metrics.entrySet()) {
+            // Group all bean configurations under a single include section
+            for (Map.Entry<String, Map<String, String>> entry : metrics.entrySet()) {
                 writer.println("      - include:");
                 writer.println("          bean: " + entry.getKey());
                 writer.println("          attribute:");
 
-                for (String attrName : entry.getValue()) {
-                    writer.println("            - " + attrName);
+                for (Map.Entry<String, String> attrEntry : entry.getValue().entrySet()) {
+                    String attrName = attrEntry.getKey();
+                    String metricType = attrEntry.getValue();
+                    writer.println("            - " + attrName + ":");
+                    writer.println("                metric_type: " + metricType);
                 }
             }
 
