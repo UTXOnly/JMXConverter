@@ -104,7 +104,7 @@ public class RemoteMBeanLister {
 
         if (description.contains("bytes") || description.contains("size")) {
             return "{bytes}";
-        } else if (description.contains("milliseconds") || description.contains("ms") || description.contains("seconds") || description.contains("time")) {
+        } else if (description.contains("milliseconds") || description.contains("ms") || description.contains("time")) {
             return "{ms}";
         } else if (description.contains("requests") || description.contains("connections")) {
             return "{requests}";
