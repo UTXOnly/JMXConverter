@@ -27,16 +27,13 @@ public class RemoteMBeanLister {
             // Define a list of allowed types
             List<String> allowedTypes = Arrays.asList("int", "long");
 
-            // Connect to the remote MBean server
             String url = "service:jmx:rmi:///jndi/rmi://" + host + ":" + port + "/jmxrmi";
             JMXServiceURL serviceURL = new JMXServiceURL(url);
             JMXConnector jmxConnector = JMXConnectorFactory.connect(serviceURL);
             MBeanServerConnection mBeanServer = jmxConnector.getMBeanServerConnection();
 
-            // Map to store MBeans, their attributes, types, descriptions, and inferred units
             Map<String, Map<String, Map<String, String>>> metrics = new HashMap<>();
 
-            // Iterate over each MBean
             Set<ObjectName> mBeans = mBeanServer.queryNames(null, null);
             for (ObjectName mBeanName : mBeans) {
                 String beanName = mBeanName.toString();
@@ -53,7 +50,6 @@ public class RemoteMBeanLister {
                     // Check if the attribute is readable and its type is in the allowed list
                     if (attrInfo.isReadable() && allowedTypes.contains(attrType)) {
                         try {
-                            // Retrieve the attribute value to confirm it is accessible
                             mBeanServer.getAttribute(mBeanName, attrName);
 
                             // Infer the metric type and unit
@@ -74,7 +70,6 @@ public class RemoteMBeanLister {
             // Write the metrics to OpenTelemetry config format
             otelConfig(metrics);
 
-            // Close the JMX connection
             jmxConnector.close();
 
         } catch (Exception e) {
@@ -123,7 +118,6 @@ public class RemoteMBeanLister {
 
 
 
-    
     private static void otelConfig(Map<String, Map<String, Map<String, String>>> metrics) {
         try (PrintWriter writer = new PrintWriter(new FileWriter("../docker/jmx_metrics_config.yaml"))) {
             writer.println("rules:");
@@ -131,7 +125,6 @@ public class RemoteMBeanLister {
             for (Map.Entry<String, Map<String, Map<String, String>>> entry : metrics.entrySet()) {
                 String beanName = entry.getKey();
     
-                // Validate and sanitize the bean name
                 if (!isValidBeanName(beanName)) {
                     System.out.println("Skipping invalid bean name: " + beanName);
                     continue;
