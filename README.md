@@ -1,4 +1,4 @@
-# JMX_converter
+# JMXConverter
 
 JMX_converter is a Java program that connects to a running Java application, collects JMX metrics, and generates an [OpenTelemetry JMX configuration file](https://opentelemetry.io/blog/2023/jmx-metric-insight/#further-capabilities-of-the-module) for the OpenTelemetry Java agent.
 
