@@ -15,13 +15,14 @@ import java.util.Set;
 public class RemoteMBeanLister {
 
     public static void main(String[] args) {
-        if (args.length != 2) {
-            System.out.println("Usage: java RemoteMBeanLister <host> <port>");
+        if (args.length != 3) {
+            System.out.println("Usage: java RemoteMBeanLister <host> <port> <output_filepath>");
             return;
         }
 
         String host = args[0];
         String port = args[1];
+        String outputFilepath = args[2];
 
         try {
             // Define a list of allowed types
@@ -68,7 +69,7 @@ public class RemoteMBeanLister {
             }
 
             // Write the metrics to OpenTelemetry config format
-            otelConfig(metrics);
+            otelConfig(metrics, outputFilepath);
 
             jmxConnector.close();
 
@@ -118,8 +119,8 @@ public class RemoteMBeanLister {
 
 
 
-    private static void otelConfig(Map<String, Map<String, Map<String, String>>> metrics) {
-        try (PrintWriter writer = new PrintWriter(new FileWriter("../docker/jmx_metrics_config.yaml"))) {
+    private static void otelConfig(Map<String, Map<String, Map<String, String>>> metrics, String outputFilepath) {
+        try (PrintWriter writer = new PrintWriter(new FileWriter(outputFilepath))) {
             writer.println("rules:");
     
             for (Map.Entry<String, Map<String, Map<String, String>>> entry : metrics.entrySet()) {
@@ -142,7 +143,7 @@ public class RemoteMBeanLister {
                     String unit = attrDetails.get("unit");
                     String alias = generateAlias(attrName);
     
-                    // Write the OpenTelemetry mapping for each attribute in the correct structure
+                    // Write the OpenTelemetry mapping for each attribute in the correct OTel config file structure
                     writer.println("      " + attrName + ":");
                     writer.println("        metric: " + alias);
                     writer.println("        type: " + metricType);
@@ -151,10 +152,10 @@ public class RemoteMBeanLister {
                 }
             }
     
-            System.out.println("otel_config.yaml file created successfully.");
+            System.out.println("OTel config file created successfully.");
     
         } catch (IOException e) {
-            System.err.println("Failed to write otel_config.yaml: " + e.getMessage());
+            System.err.println("Failed to write OTel config file: " + e.getMessage());
         }
     }
 
