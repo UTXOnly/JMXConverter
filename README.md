@@ -84,7 +84,7 @@ rules:
         type: gauge
         desc: "UsageThreshold"
         unit: '{unit}'
-  - bean: 'java.lang:name=CodeHeap,type=MemoryPool'
+  - bean: 'java.lang:name=CodeHeap ''profiled nmethods'',type=MemoryPool'
     mapping:
       UsageThresholdCount:
         metric: jmx.usage_threshold_count
