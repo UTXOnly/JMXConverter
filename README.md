@@ -100,9 +100,9 @@ rules:
 ```
 
 #### Troubleshooting
-YAML Parsing Errors: Ensure that unit fields are formatted as strings (e.g., unit: '{count}').
-ClassCastException: This error typically occurs if the YAML format is incorrect. Verify that special characters in bean names are handled correctly.
-NoClassDefFoundError: If using a JAR file, ensure all .class files, including inner classes, are properly included.
+* **YAML Parsing Errors:** Ensure that unit fields are formatted as strings (e.g., unit: '{count}').
+* **ClassCastException:** This error typically occurs if the YAML format is incorrect. Verify that special characters in bean names are handled correctly.
+* **NoClassDefFoundError:** If using a JAR file, ensure all .class files, including inner classes, are properly included.
 
 ### TO DO
 * [ ] CLI menu
