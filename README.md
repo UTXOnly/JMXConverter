@@ -32,7 +32,7 @@ docker-compose up
 
 #### Note
 
-The sampe Java application needs to be running in order to run the JMX collector. There is a blank `jmx_metrics_config.yaml` file that is built into the DOcker image as it is inclued in the container `ENTRYPOINT`. The application will start with the blank metric config file and only populates when the `JMX_converter` is run. Once the file is generated you can bring down the docker compose stack. Then, delete the application image and bring the docker compose stack back up to rebuild the docker container.
+The sampe Java application needs to be running in order to run the JMX collector. There is a blank `jmx_metrics_config.yaml` file that is built into the Docker image as it is inclued in the container `ENTRYPOINT`. The application will start with the blank metric config file and only populates when the `JMX_converter` is run. Once the file is generated you can bring down the docker compose stack. Then, delete the application image and bring the docker compose stack back up to rebuild the docker container.
 
 The JMX metric configuation file is evaluated at application startup, so unfortunately the inconvenient procedure mentioned above is necessary.
 
