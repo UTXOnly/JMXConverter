@@ -13,7 +13,7 @@ JMXConverter is a Java program that connects to a running Java application, coll
 Clone the repository:
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/UTXOnly/JMXConverter.git
 cd <repository-folder>
 ```
 
