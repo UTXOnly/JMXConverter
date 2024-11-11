@@ -2,6 +2,7 @@ import javax.management.*;
 import javax.management.remote.JMXConnector;
 import javax.management.remote.JMXConnectorFactory;
 import javax.management.remote.JMXServiceURL;
+import javax.management.ObjectName;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -114,17 +115,32 @@ public class RemoteMBeanLister {
         return "{unit}";  // Default unit if no keyword is matched
     }
 
-    private static void otelConfig(Map<String, Map<String, Map<String, String>>> metrics) {
-        try (PrintWriter writer = new PrintWriter(new FileWriter("otel_config.yaml"))) {
-            writer.println("---");
-            writer.println("rules:");
+    private static String sanitizeBeanName(String beanName) {
+        // Replace single quotes with double single quotes and wrap the entire bean name in single quotes
+        beanName = beanName.replace("'", "''");
+        return "'" + beanName + "'";
+    }
 
+
+
+    
+    private static void otelConfig(Map<String, Map<String, Map<String, String>>> metrics) {
+        try (PrintWriter writer = new PrintWriter(new FileWriter("../docker/jmx_metrics_config.yaml"))) {
+            writer.println("rules:");
+    
             for (Map.Entry<String, Map<String, Map<String, String>>> entry : metrics.entrySet()) {
                 String beanName = entry.getKey();
-
-                writer.println("  - bean: " + beanName);
+    
+                // Validate and sanitize the bean name
+                if (!isValidBeanName(beanName)) {
+                    System.out.println("Skipping invalid bean name: " + beanName);
+                    continue;
+                }
+                String sanitizedBeanName = sanitizeBeanName(beanName);
+    
+                writer.println("  - bean: " + sanitizedBeanName);
                 writer.println("    mapping:");
-
+    
                 for (Map.Entry<String, Map<String, String>> attrEntry : entry.getValue().entrySet()) {
                     String attrName = attrEntry.getKey();
                     Map<String, String> attrDetails = attrEntry.getValue();
@@ -132,22 +148,33 @@ public class RemoteMBeanLister {
                     String description = attrDetails.get("desc");
                     String unit = attrDetails.get("unit");
                     String alias = generateAlias(attrName);
-
-                    // Write the OpenTelemetry mapping for each attribute
+    
+                    // Write the OpenTelemetry mapping for each attribute in the correct structure
                     writer.println("      " + attrName + ":");
                     writer.println("        metric: " + alias);
                     writer.println("        type: " + metricType);
-                    writer.println("        desc: " + description);
-                    writer.println("        unit: " + unit);
+                    writer.println("        desc: \"" + description + "\"");
+                    writer.println("        unit: '" + unit + "'");
                 }
             }
-
+    
             System.out.println("otel_config.yaml file created successfully.");
-
+    
         } catch (IOException e) {
             System.err.println("Failed to write otel_config.yaml: " + e.getMessage());
         }
     }
+
+    
+    private static boolean isValidBeanName(String beanName) {
+        try {
+            ObjectName objectName = new ObjectName(beanName);
+            return !objectName.isPattern();
+        } catch (MalformedObjectNameException e) {
+            return false;
+        }
+    }
+
 
     private static String generateAlias(String attrName) {
         // Convert camelCase to snake_case by inserting underscores before uppercase letters

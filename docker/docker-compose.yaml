@@ -1,0 +1,44 @@
+
+services:
+  jmx-otel:
+    depends_on:
+      - otelcol
+    container_name: jmx-otel
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - OTEL_SERVICE_NAME=jmx-otel
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otelcol:4317
+      - OTEL_LOGS_EXPORTER=otlp
+      - OTEL_RESOURCE_ATTRIBUTES=deployment.environment=docker,host.name=otelcol-docker
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+    ports:
+      - "8080:8080"
+      - "9000:9000"
+
+  # open-telemetry collector
+  otelcol:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-col
+    deploy:
+      resources:
+        limits:
+          memory: 100M
+    environment:
+      - DD_API_KEY
+      - DD_SITE
+    restart: always
+    command: ["--config=/etc/otel-config.yaml"]
+    volumes:
+      - ./otel-config.yaml:/etc/otel-config.yaml
+    ports:
+      - "4317:4317" # OTLP over gRPC receiver
+      - "4318:4318" # OTLP over HTTP receiver
+      - "9464" # Prometheus exporter
+      - "8888" # metrics endpoint
+
+networks:
+  default:
+    name: opentelemetry-demo
+    driver: bridge
