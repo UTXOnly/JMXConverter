@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class RemoteMBeanLister {
+public class JMXConverter {
 
     public static void main(String[] args) {
         if (args.length != 3) {

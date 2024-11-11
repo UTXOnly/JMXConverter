@@ -48,7 +48,7 @@ DD_SITE=<YOUR_SITE>
 #### Compile JMX_converter:
 
 ```bash
-javac RemoteMBeanLister.java
+javac JMXConverter.java
 ```
 
 To run JMX_remote provide the hostname and port of the remote JMX server as arguments. This will create an OpenTelemetry-compatible YAML configuration file called `jmx_metrics_config.yaml` in the `/docker` directory to be used by the sandbox environment.
@@ -56,13 +56,13 @@ To run JMX_remote provide the hostname and port of the remote JMX server as argu
 
 
 ```bash
-java RemoteMBeanLister <host> <port> <output_filepath>
+java JMXConverter <host> <port> <output_filepath>
 ```    
 
 ##### Example:
 
 ```bash
-java RemoteMBeanLister localhost 9000 ../docker/jmx_metrics_config.yaml # Use this filepath to put config file in properlocation for sandbox testing
+java JMXConverter localhost 9000 ../docker/jmx_metrics_config.yaml # Use this filepath to put config file in properlocation for sandbox testing
 ```
 
 
