@@ -22,10 +22,8 @@ public class SimpleJettyApp {
     private static final List<Integer> randomNumbers = new ArrayList<>();
 
     public static void main(String[] args) throws Exception {
-        // Create a basic Jetty server on port 8080
         Server server = new Server(8080);
 
-        // Set up the servlet context handler
         ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
         context.setContextPath("/");
         server.setHandler(context);
@@ -35,7 +33,6 @@ public class SimpleJettyApp {
         context.addServlet(new ServletHolder(new StoreRandomNumberServlet()), "/api/store-random-number");
         context.addServlet(new ServletHolder(new AllRandomNumberServlet()), "/api/all-random-number");
 
-        // Start the server
         server.start();
         server.join();
     }
