@@ -6,8 +6,8 @@ receivers:
       http:
         endpoint: 0.0.0.0:4318
 exporters:
-  logging:
-    verbosity: detailed
+  #logging:
+  #  verbosity: detailed
   datadog:
     traces:
       span_name_as_resource_name: true
@@ -33,6 +33,6 @@ service:
     metrics:
       receivers: [otlp, datadog/connector]
       exporters: [datadog]
-    logs:
-      receivers: [otlp]
-      exporters: [datadog]
+    #logs:
+    #  receivers: [otlp]
+    #  exporters: [datadog]
